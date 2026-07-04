@@ -1,0 +1,103 @@
+networks:
+  doris_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.80.0/24
+
+services:
+  fe:
+    image: apache/doris:fe-4.1.0
+    hostname: fe
+    ports:
+      - 8030:8030
+      - 9030:9030
+      - 9010:9010
+    environment:
+      - FE_SERVERS=fe1:172.20.80.2:9010
+      - FE_ID=1
+    networks:
+      doris_network:
+        ipv4_address: 172.20.80.2
+    volumes:
+      - ./doris/fe/doris-meta:/opt/apache-doris/fe/doris-meta
+      - ./doris/fe/log:/opt/apache-doris/fe/log
+
+  be:
+    image: apache/doris:be-4.1.0
+    hostname: be
+    ports:
+      - 8040:8040
+      - 9050:9050
+    environment:
+      - FE_SERVERS=fe1:172.20.80.2:9010
+      - BE_ADDR=172.20.80.3:9050
+    depends_on:
+      - fe
+    networks:
+      doris_network:
+        ipv4_address: 172.20.80.3
+    volumes:
+      - ./doris/be/storage:/opt/apache-doris/be/storage
+      - ./doris/be/log:/opt/apache-doris/be/log
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: kafka-log-platform
+    # 外部宿主机暂时通过 29092 访问 Kafka（生产者/消费者/cli 命令/插件）
+    # Docker 内部通过 9092 互访（ClickHouse 等容器直接用 kafka:9092）
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # kafka listener 是 broker 与外部沟通的接口
+      # 因为本项目中 kafka 与 clickhouse 为容器间通信，而 java 程序、插件位于宿主机，因此维护了 internal 与 external 两个 listener
+      # 未来 java 程序（无论是开发还是部署）应当容器化，插件（用于可视化监控 kafka）应当迎合容器
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093 # 9093 用于 KRaft 内部通信
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      # 各 listener 均使用最简单的 plaintext 协议
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      # 显示指定 broker 间通信的 listener
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+    networks:
+      doris_network:
+        ipv4_address: 172.20.80.10
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-log-platform
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SERVER_HTTP_PORT: 3000
+      # 允许匿名只读访问仪表盘（可选，演示用）
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      doris_network:
+        ipv4_address: 172.20.80.20
+
+  fluent-bit:
+    image: cr.fluentbit.io/fluent/fluent-bit:5.0
+    command: -c /fluent-bit/etc/fluent-bit.yaml
+    volumes:
+      - ./fluent-bit.yaml:/fluent-bit/etc/fluent-bit.yaml
+      - ./logs:/logs:ro
+    networks:
+      doris_network:
+        ipv4_address: 172.20.80.30
+
+volumes:
+  grafana-data:

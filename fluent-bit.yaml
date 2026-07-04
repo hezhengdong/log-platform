@@ -1,0 +1,17 @@
+parsers:
+  - name: json
+    format: json
+
+pipeline:
+  inputs:
+    - name: tail
+      path: /logs/*.log
+      parser: json
+      inotify_watcher: false
+      refresh_interval: 2
+
+  outputs:
+    - name: kafka
+      match: "*"
+      brokers: kafka:9092
+      topics: app-logs
