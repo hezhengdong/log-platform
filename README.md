@@ -78,6 +78,11 @@ graph LR
 
 日志格式：通过 LogstashEncoder 将输出格式化位 JSON。
 
+## 未来优化
+
+- 很多组件，某一层出现问题，该如何排查？
+- K8s 中日志采集应当使用 DaemonSet。
+
 ## 参考文档
 
 Doris 部署
