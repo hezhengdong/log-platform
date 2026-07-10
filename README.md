@@ -78,11 +78,6 @@ graph LR
 
 日志格式：通过 LogstashEncoder 将输出格式化位 JSON。
 
-## 未来优化
-
-- 很多组件，某一层出现问题，该如何排查？
-- K8s 中日志采集应当使用 DaemonSet。
-
 ## 参考文档
 
 Doris 部署
@@ -99,3 +94,11 @@ https://docs.fluentbit.io/manual/data-pipeline/inputs/tail
 
 https://docs.fluentbit.io/manual/data-pipeline/outputs/kafka
 
+## 未来优化
+
+- 很多组件，某一层出现问题，该如何排查？
+- K8s 中日志采集应当使用 DaemonSet。
+
+## 反思
+
+回过头看，用了大概四天时间，三天时间在进行调研与知识梳理：大数据架构是什么样的？发展脉络是什么？系统应该使用什么架构？什么技术栈？随后进行需求分析，从对应技术官方文档学习如何使用。写代码反而是最轻松的？
